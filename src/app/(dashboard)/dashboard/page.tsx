@@ -1,0 +1,173 @@
+"use client";
+
+import React, { useMemo, useEffect, useState } from 'react';
+import { useTeam } from '@/components/providers/team-provider';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Trophy, 
+  ShieldCheck, 
+  CalendarDays, 
+  Users, 
+  Zap, 
+  Plus, 
+  UserPlus, 
+  ClipboardCheck, 
+  HandHelping, 
+  PiggyBank, 
+  Activity,
+  ChevronRight,
+  TrendingUp,
+  FileText,
+  MapPin,
+  ArrowRight
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { format, isFuture, isToday } from 'date-fns';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, limit } from 'firebase/firestore';
+
+export default function UniversalAccountDashboard() {
+  const { 
+    user, activeTeam, householdEvents, 
+    householdBalance
+  } = useTeam();
+  const router = useRouter();
+  const db = useFirestore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const gamesQuery = useMemoFirebase(() => {
+    if (!db || !activeTeam?.id) return null;
+    return query(collection(db, 'teams', activeTeam.id, 'games'), limit(20));
+  }, [db, activeTeam?.id]);
+  const { data: games } = useCollection(gamesQuery);
+  
+  const winRate = useMemo(() => {
+    if (!games || games.length === 0) return 0;
+    const wins = games.filter((g: any) => g.result === 'Win').length;
+    return Math.round((wins / games.length) * 100);
+  }, [games]);
+
+  const docsQuery = useMemoFirebase(() => {
+    if (!db || !activeTeam?.id) return null;
+    return collection(db, 'teams', activeTeam.id, 'documents');
+  }, [db, activeTeam?.id]);
+  const { data: documents } = useCollection(docsQuery);
+  const pendingWaiversCount = useMemo(() => documents?.length || 0, [documents]);
+
+  const volQuery = useMemoFirebase(() => {
+    if (!db || !activeTeam?.id) return null;
+    return query(collection(db, 'teams', activeTeam.id, 'volunteers'), limit(5));
+  }, [db, activeTeam?.id]);
+  const { data: volunteers } = useCollection(volQuery);
+
+  const fundQuery = useMemoFirebase(() => {
+    if (!db || !activeTeam?.id) return null;
+    return query(collection(db, 'teams', activeTeam.id, 'fundraising'), limit(5));
+  }, [db, activeTeam?.id]);
+  const { data: fundraisers } = useCollection(fundQuery);
+
+  const upcomingItinerary = useMemo(() => {
+    if (!householdEvents || !Array.isArray(householdEvents)) return [];
+    return householdEvents.filter(e => isFuture(new Date(e.date)) || isToday(new Date(e.date))).slice(0, 3);
+  }, [householdEvents]);
+
+  if (!mounted || !user) return (
+    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+      <div className="h-12 w-12 bg-primary/10 rounded-full mb-4" />
+      <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Synchronizing Dashboard...</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-10 pb-20 animate-in fade-in duration-700">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <Badge className="bg-primary/10 text-primary border-none font-black uppercase text-[9px] h-6 px-3">Master Intelligence</Badge>
+          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-foreground">Command Hub</h1>
+          <p className="text-muted-foreground font-bold uppercase tracking-[0.2em] text-[10px] ml-1">Status: Operational • {user.role?.replace(/_/g, ' ')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => router.push('/teams/new')} variant="outline" className="rounded-xl h-12 border-2 font-black uppercase text-[10px] text-foreground">
+            <Plus className="h-4 w-4 mr-2" /> New Squad
+          </Button>
+          <Button onClick={() => router.push('/teams/join')} className="rounded-xl h-12 px-6 font-black uppercase text-[10px] shadow-lg shadow-primary/20">
+            <UserPlus className="h-4 w-4 mr-2" /> Recruitment Hub
+          </Button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="rounded-[2.5rem] shadow-xl bg-primary text-white p-8 space-y-2 relative overflow-hidden group">
+          <TrendingUp className="absolute -right-4 -bottom-4 h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform duration-700" />
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Victory Ratio</p>
+          <p className="text-5xl font-black">{winRate}%</p>
+        </Card>
+        <Card className="rounded-[2.5rem] shadow-xl bg-black text-white p-8 space-y-2 relative overflow-hidden group">
+          <ClipboardCheck className="absolute -right-4 -bottom-4 h-24 w-24 opacity-10 -rotate-12 group-hover:scale-110 transition-transform duration-700" />
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Compliance</p>
+          <div className="flex items-baseline gap-1"><p className="text-5xl font-black">{pendingWaiversCount}</p><span className="text-sm font-black text-primary uppercase">Pending</span></div>
+        </Card>
+        <Card className="rounded-[2.5rem] shadow-xl bg-white p-8 space-y-2 ring-1 ring-black/5 relative overflow-hidden group">
+          <Zap className="absolute -right-4 -bottom-4 h-24 w-24 text-primary opacity-5 -rotate-12 group-hover:scale-110 transition-transform duration-700" />
+          <p className="text-[10px] font-black uppercase text-muted-foreground">Community</p>
+          <div className="flex items-baseline gap-1"><p className="text-5xl font-black text-primary">{(volunteers?.length || 0) + (fundraisers?.length || 0)}</p><span className="text-sm font-black text-foreground uppercase">Ops</span></div>
+        </Card>
+        <Card className="rounded-[2.5rem] shadow-xl bg-muted/20 p-8 space-y-2">
+          <p className="text-[10px] font-black uppercase text-muted-foreground">Household</p>
+          <p className="text-3xl font-black text-foreground">${householdBalance.toLocaleString()}</p>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[8px] font-black uppercase border mt-2 text-foreground" onClick={() => router.push('/family')}>Audit Detail</Button>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary" /><h3 className="text-xl font-black uppercase text-foreground">Mission Itinerary</h3></div>
+              <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-foreground" onClick={() => router.push('/calendar')}>Master Calendar <ChevronRight className="h-3 w-3 ml-1" /></Button>
+            </div>
+            {upcomingItinerary.length > 0 ? upcomingItinerary.map((event) => (
+              <Card key={event.id} className="rounded-3xl border-none shadow-sm ring-1 ring-black/5 hover:shadow-lg transition-all group overflow-hidden bg-white cursor-pointer" onClick={() => router.push('/calendar')}>
+                <div className="flex items-stretch h-24">
+                  <div className="w-20 bg-muted/30 flex flex-col items-center justify-center border-r shrink-0">
+                    <span className="text-[8px] font-black uppercase opacity-40 text-foreground">{format(new Date(event.date), 'MMM')}</span>
+                    <span className="text-2xl font-black text-foreground">{format(new Date(event.date), 'dd')}</span>
+                  </div>
+                  <div className="flex-1 p-5 flex flex-col justify-center min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <Badge className="bg-primary/10 text-primary border-none text-[7px] uppercase font-black px-1.5 h-4">{event.eventType}</Badge>
+                      <span className="text-[10px] font-bold text-muted-foreground">{event.startTime}</span>
+                    </div>
+                    <h4 className="font-black text-sm uppercase truncate group-hover:text-primary transition-colors text-foreground">{event.title}</h4>
+                  </div>
+                </div>
+              </Card>
+            )) : (
+              <div className="text-center py-12 bg-muted/10 rounded-3xl border-2 border-dashed opacity-40"><p className="text-xs font-black uppercase tracking-widest text-foreground">No active deployments</p></div>
+            )}
+          </section>
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 px-2"><HandHelping className="h-5 w-5 text-primary" /><h3 className="text-xl font-black uppercase text-foreground">Community Intelligence</h3></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card className="rounded-[2rem] border-none shadow-md bg-white p-6 space-y-4"><p className="text-[10px] font-black uppercase text-foreground">Open Volunteer Ops</p>{volunteers?.slice(0, 2).map((v: any) => (<div key={v.id} className="flex items-center justify-between gap-4"><p className="text-xs font-black uppercase truncate text-foreground">{v.title}</p><Button size="sm" variant="ghost" className="h-7 text-[8px] font-black border uppercase" onClick={() => router.push('/volunteers')}>Claim</Button></div>))}</Card>
+              <Card className="rounded-[2rem] border-none shadow-md bg-white p-6 space-y-4"><p className="text-[10px] font-black uppercase text-foreground">Active Fundraising</p>{fundraisers?.slice(0, 2).map((f: any) => (<div key={f.id} className="flex items-center justify-between gap-4"><p className="text-xs font-black uppercase truncate text-foreground">{f.title}</p><Button size="sm" variant="ghost" className="h-7 text-[8px] font-black border uppercase" onClick={() => router.push('/fundraising')}>Join</Button></div>))}</Card>
+            </div>
+          </section>
+        </div>
+        <aside className="space-y-8">
+          <Card className="rounded-[2rem] bg-black text-white p-8 space-y-6 relative overflow-hidden group">
+            <ShieldCheck className="absolute top-0 right-0 p-6 opacity-10 -rotate-12 h-32 w-32 group-hover:scale-110 transition-transform duration-700" />
+            <h3 className="text-2xl font-black uppercase tracking-tight">Join a League</h3>
+            <p className="text-xs text-white/60 font-medium leading-relaxed italic">Enter a coordinate league code provided by your organization manager to instantly enroll your household into competitive standings.</p>
+            <Button onClick={() => router.push('/teams/join')} className="w-full h-12 rounded-xl bg-white text-black font-black uppercase text-[10px] shadow-xl">Open Portal <ArrowRight className="ml-2 h-5 w-5" /></Button>
+          </Card>
+          <Card className="rounded-[2rem] shadow-xl bg-white p-6 space-y-4 ring-1 ring-black/5"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><CardTitle className="text-[10px] font-black uppercase text-foreground">Roster Compliance</CardTitle></div><p className="text-[10px] font-medium text-muted-foreground leading-relaxed">Ensure all teammates have signed their liability and media release waivers before match day.</p><Button onClick={() => router.push('/files')} variant="outline" className="w-full h-10 rounded-xl font-black uppercase text-[10px] border-2">Audit Ledger</Button></Card>
+        </aside>
+      </div>
+    </div>
+  );
+}
